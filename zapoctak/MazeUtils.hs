@@ -1,14 +1,14 @@
 module MazeUtils (
     Maze,Cell(..),Point,printMaze,saveMaze,initializeMaze,setCell,
-    connectPoints,connectAllPoints,inBounds,movements,applyMove,
-    isValidMove,directions
+    inBounds,movements,applyMove,hasCycle,
+    isValidMove,directions, generatePathPoints,setFree,setFree2
 ) where
 
 
 import Data.Array.Base (writeArray)
 import Data.Array.IO
 import Data.Array.MArray
-import Data.List (intercalate)
+import Data.List (intercalate, nub)
 import Data.Array
 
 data Cell = Wall | Free
@@ -34,27 +34,44 @@ saveMaze path maze = writeFile path $ mazeToString maze
 initializeMaze :: Int -> Int -> Maze
 initializeMaze height width = replicate height (replicate width Wall)
 
+height :: Maze -> Int
+height = length
+
+width :: Maze -> Int
+width = length . head
+
+
+
 setCell :: Maze -> Point -> Cell -> Maze
-setCell maze (x, y) cell = 
-    let (before, row:after) = splitAt x maze
-        (rowBefore, _:rowAfter) = splitAt y row
-    in before ++ [rowBefore ++ (cell : rowAfter)] ++ after
-
-connectPoints :: Point -> Point -> Maze -> Maze
-connectPoints (x1, y1) (x2, y2) maze
-    | x1 == x2 = foldl (\m y -> setCell m (x1, y) Free) maze (range y1 y2)
-    | y1 == y2 = foldl (\m x -> setCell m (x, y1) Free) maze (range x1 x2)
-    | otherwise = foldl (\m (x, y) -> setCell m (x, y) Free) maze (zip (range x1 x2) (range y1 y2))
+setCell maze (x, y) cell
+    | x < 0 || x >= length maze = maze  -- Check row index bounds
+    | y < 0 || y >= length (head maze) = maze  -- Check column index bounds
+    | otherwise = before ++ [newRow] ++ after
   where
+    (before, row:after) = splitAt x maze
+    (rowBefore, _:rowAfter) = splitAt y row
+    newRow = rowBefore ++ (cell : rowAfter)
+
+
+generatePathPoints :: [Point] -> [Point]
+generatePathPoints [] = []
+generatePathPoints [p] = [p]
+generatePathPoints (p1@(x1, y1):p2@(x2, y2):rest)
+    | x1 == x2  = [(x1, y) | y <- range y1 y2] ++ generatePathPoints (p2:rest)
+    | y1 == y2  = [(x, y1) | x <- range x1 x2] ++ generatePathPoints (p2:rest)
+    | otherwise = error "Path should only move horizontally or vertically"
+    where
     range a b
-        | a <= b = [a..b]
-        | otherwise = reverse [b..a]
+        | a <= b    = [a..b-1]
+        | otherwise = [b+1..a]
 
-connectAllPoints :: [Point] -> Maze -> Maze
-connectAllPoints [] maze = maze
-connectAllPoints [_] maze = maze
-connectAllPoints (p1:p2:ps) maze = connectAllPoints (p2:ps) (connectPoints p1 p2 maze)
+setFree :: [Point] -> Maze -> Maze
+setFree crossroads maze = foldr (\point accMaze -> setCell accMaze point Free) maze points
+    where 
+        points = generatePathPoints crossroads
 
+setFree2 :: [Point] -> Maze -> Maze
+setFree2 crossroads maze = foldr (\point accMaze -> setCell accMaze point Free) maze crossroads
 
 inBounds :: Int -> Int -> Point -> Bool
 inBounds height width (x, y) = x >= 0 && x < height && y >= 0 && y < width
@@ -73,3 +90,7 @@ isValidMove maze path (x, y) =
     inBounds (length maze) (length (head maze)) (x, y) &&
     notElem (x, y) path &&
     (maze !! x !! y == Wall)
+
+hasCycle :: [Point] -> Bool
+hasCycle points = length path /= length (nub path)
+    where path = generatePathPoints points
