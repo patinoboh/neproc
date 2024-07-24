@@ -53,7 +53,7 @@ generatePath (minRow, maxRow) (minCol, maxCol) (startRow, startCol) = go [(start
             Nothing        -> return []
     go path True len = do
         -- ys <- rngList rowBottom rowTop retr
-        ys <- shuffleRange rowBottom rowTop
+        ys <- shuffleRange (rowBottom + 1) (rowTop - 1)
         -- putStrLn $ show len ++ " V, (rB,rT)=(" ++ show rowBottom ++ "," ++ show rowTop ++ ") ys (min,max)=" ++ show (minimum ys) ++ "," ++ show (maximum ys) ++ ")"
         -- putStrLn $ "V, (rB,rT)=(" ++ show rowBottom ++ "," ++ show rowTop ++ ")"
         -- print ys
@@ -77,7 +77,7 @@ generatePath (minRow, maxRow) (minCol, maxCol) (startRow, startCol) = go [(start
 
     go path False len = do
         -- xs <- rngList colBottom colTop retr
-        xs <- shuffleRange colBottom colTop
+        xs <- shuffleRange (colBottom + 1) (colTop - 1)
         -- putStrLn $ show len ++ " horizontal"
         -- putStrLn $ show len ++ " H, (cB,cT)=(" ++ show colBottom ++ "," ++ show colTop ++ ") xs (min,max)=" ++ show (minimum xs) ++ "," ++ show (maximum xs) ++ ")"
         -- putStrLn $ "H, (cB,cT)=(" ++ show colBottom ++ "," ++ show colTop ++ ")"
@@ -107,7 +107,9 @@ generateDeadEnd (minRow, maxRow) (minCol, maxCol) (startRow, startCol) fullMaze 
     -- deadPath vertical len
     go deadPath _ 0 = return deadPath
     go deadPath True len = do
-        ys <- shuffleRange rowBottom rowTop
+        ys <- shuffleRange (rowBottom + 1) (rowTop - 1)
+        -- putStrLn $ show len ++ " D (rB,rT)=(" ++ show rowBottom ++ "," ++ show rowTop ++ ") ys=" ++ show ys ++ ")"
+        -- putStrLn $ "full maze len : " ++ show (length fullMaze) ++ " full path len : " ++ show (length fullPath) ++ " dead path len : " ++ show (length deadPath) ++ " spolu : " ++ show (length (fullMaze ++ fullPath))
         exploreYs ys
             where
                 (row,col) = head deadPath
@@ -118,23 +120,26 @@ generateDeadEnd (minRow, maxRow) (minCol, maxCol) (startRow, startCol) fullMaze 
                     if row /= newRow
                         then do
                             let newPath = (newRow, col) : deadPath
+                            -- putStrLn $ "Calling go recursively from V len : " ++ show len
                             result <- go newPath False (len - 1)
                             if null result
                                 then exploreYs rest
                                 else return result
                     else exploreYs rest
     go deadPath False len = do
-        xs <- shuffleRange colBottom colTop
+        xs <- shuffleRange (colBottom + 1) (colTop - 1)
+        -- putStrLn $ show len ++ " D (rB,rT)=(" ++ show colBottom ++ "," ++ show colTop ++ ") ys=" ++ show xs ++ ")"
         exploreXs xs
             where
                 (row,col) = head deadPath
                 fullPath = generatePathPoints deadPath
-                (colBottom, colTop) = findRange False (fullMaze ++ fullPath) (head deadPath) (minCol, maxCol - 1)
+                (colBottom, colTop) = findRange False (fullMaze ++ fullPath) (row,col) (minCol, maxCol - 1)
                 exploreXs [] = return []
                 exploreXs (newCol:rest) = do
                     if col /= newCol
                         then do
                             let newPath = (row, newCol) : deadPath
+                            -- putStrLn $ "Calling go recursively from H len : " ++ show len
                             result <- go newPath True (len - 1)
                             if null result
                                 then exploreXs rest
@@ -145,8 +150,11 @@ generateDeadEnds :: Point -> Point -> [Point] -> [Point] -> Int -> IO [Point]
 generateDeadEnds _ _ f [] _ = return f
 generateDeadEnds (minRow, maxRow) (minCol, maxCol) fullMazePath points@(start:rest) pathLength = do
     randBool <- randomBool
-    deadEnd <- generateDeadEnd (minRow, maxRow) (minCol, maxCol) start fullMazePath randBool pathLength
-    generateDeadEnds (minRow, maxRow) (minCol, maxCol) (fullMazePath ++ generatePathPoints deadEnd) rest pathLength
+    -- putStrLn $ "Generating dead end number : " ++ show (length points)
+    deadEnd <- generateDeadEnd (minRow, maxRow) (minCol, maxCol) start fullMazePath randBool pathLength    
+    print deadEnd
+    let newMaze = fullMazePath ++ generatePathPoints deadEnd
+    generateDeadEnds (minRow, maxRow) (minCol, maxCol) newMaze rest pathLength
 
 -- main :: IO ()
 -- main = do
@@ -159,6 +167,20 @@ generateDeadEnds (minRow, maxRow) (minCol, maxCol) fullMazePath points@(start:re
 --     print path
 --     printMaze maze
 
+
+-- main :: IO ()
+-- main = do
+--     let height = 20
+--     let width = 30
+--     let startCol = 6
+--     let pathLength = 10
+--     print "Generating path..."
+--     path <- generatePath (0, height - 1) (0, width - 1) (0, startCol) pathLength
+--     print "Path generated!"
+--     let maze = setFree path (initializeMaze height width)
+--     printMaze maze
+
+
 main :: IO ()
 main = do
     let height = 20
@@ -168,6 +190,7 @@ main = do
     print "Generating path..."
     path <- generatePath (0, height - 1) (0, width - 1) (0, startCol) pathLength
     print "Path generated!"
+    print path
     let fullPath = generatePathPoints path
     print "Generating dead ends..."
     mazePath <- generateDeadEnds (0, height - 1) (0, width - 1) fullPath (tail (init path)) 4
