@@ -70,4 +70,4 @@ main = do
     path <- generateValidPath 1 (height - 2) 1 (width - 2) numJunctions
     print "Path found!"
     let mazeWithPath = connectAllPoints path maze
-    print mazeWithPath
+    print mazeWithPathc

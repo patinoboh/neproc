@@ -8,23 +8,6 @@ import Data.Ord (comparing)
 import qualified Data.Set as Set
 import Data.Function (on)
 
-generatePathPoints :: [Point] -> [Point]
-generatePathPoints [] = []
-generatePathPoints [p] = [p]
-generatePathPoints (p1@(x1, y1):p2@(x2, y2):rest)
-    | x1 == x2  = [(x1, y) | y <- range y1 y2] ++ generatePathPoints (p2:rest)
-    | y1 == y2  = [(x, y1) | x <- range x1 x2] ++ generatePathPoints (p2:rest)
-    | otherwise = error "Path should only move horizontally or vertically"
-    where
-    range a b
-        | a <= b    = [a..b-1]
-        | otherwise = [b+1..a]
-
-hasCycle :: [Point] -> Bool
-hasCycle points = length path /= length (nub path)
-    where path = generatePathPoints points
-
-
 tryMoveToEdges :: Int -> Int -> [Point] -> Maybe [Point]
 tryMoveToEdges width height path = tryEdges edgePoints
   where

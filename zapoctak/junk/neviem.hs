@@ -56,40 +56,21 @@ findRange False fullPath (x,y) (fromX, toX) = (maximum leftX, minimum rightX)
         leftX = if null leftXTemp then [x] else leftXTemp where
             leftXTemp = filter (< x) allX
     
-
-tryNewPoint :: Bool -> Point -> [Point] -> [Int] -> Maybe Int
-tryNewPoint True _ fullPath [] = Nothing
-tryNewPoint True p@(x,y) fullPath (newY:rest)
-    | (y /= newY) && not (hasCycle2 (newLine ++ fullPath)) = Just newY
-    | otherwise                                           = tryNewPoint True p fullPath rest
-    where
-    newLine = filter (/=p) (generatePathPoints [p, (x, newY)])
-
-tryNewPoint False _ fullPath [] = Nothing
-tryNewPoint False p@(x,y) fullPath (newX:rest)
-    | (x /= newX) && not (hasCycle2 (newLine ++ fullPath)) = Just newX
-    | otherwise                                            = tryNewPoint False p fullPath rest
-    where
-    newLine = filter (/=p) (generatePathPoints [p, (newX, y)])
-
-generatePath :: Point -> Point -> Int -> Int -> IO [Point]
-generatePath (fromX, width) (fromY, height) startX = go [(startX, 0)] True
+generatePath :: Point -> Point -> Point -> Int -> IO [Point]
+generatePath (fromX, width) (fromY, height) (startX, startY) = go [(startX, startY)] True
   where
     retr = 100
 
     go :: [Point] -> Bool -> Int -> IO [Point]
     go path isVertical 0 = do
-        putStrLn "som na nule"
+        putStrLn $ "0"
         case tryMoveToEdges width height path of
             Just finalPath -> return finalPath
-            -- Nothing        -> go (tail path) (not isVertical) 1
             Nothing        -> return []
     go path True len = do
-        -- let (x,y) = head path
-        -- let fullPath = generatePathPoints path
-        -- let (yBot, yTop) = findRange True fullPath (x,y) (fromY, height - 2)
         ys <- rngList yBot yTop retr
-        putStr $ "len " ++ show len ++ " yBot, yTop " ++ show (yBot, yTop) ++ " len path " ++ show (length path) ++ "\n"
+        -- ys <- shuffleRange yBot yTop
+        putStrLn $ show len ++ " horizontal"
         exploreYs ys
             where
                 (x,y) = head path
@@ -107,50 +88,37 @@ generatePath (fromX, width) (fromY, height) startX = go [(startX, 0)] True
                                 then exploreYs rest  -- Try next option if current one fails
                                 else return result
                         else exploreYs rest  -- Try next option if current one fails
-        -- case tryNewPoint True (head path) fullPath ys of            
-        --     Just newPoint -> do
-        --         result <- go ((x, newPoint):path) False (len - 1)
-        --         if null result
-        --             then go (tail path) False (len + 1)
-        --             else return result                    
-        --     Nothing -> go (tail path) False (len + 1)
 
 
     go path False len = do
-        let (x,y) = head path
-        let fullPath = generatePathPoints path
-        let (xBot, xTop) = findRange False fullPath (head path) (fromX, width - 2)
-        putStr $ "len " ++ show len ++ " xBot, xTop " ++ show (xBot, xTop) ++ " len path " ++ show (length path) ++ "\n"
         xs <- rngList xBot xTop retr
-        case tryNewPoint False (head path) fullPath xs of
-            Just newPoint -> do
-                result <- go ((newPoint, y):path) True (len - 1)
-                if null result
-                    then go (tail path) True (len + 1)
-                    else return result
-            Nothing -> go (tail path) True (len + 1)
-
-
--- | retries == 0 = go (tail path) (not isVertical) (len + 1) retr
--- let (x, y) = head path
--- if isVertical
--- then do
---     nextY <- rng 0 (height - 1)
---     if nextY /= y && not (hasCycle ((x, nextY):path))
---         then go ((x, nextY):path) False (len - 1)
---         else go path False (len + 1) -- Retry if invalid move
--- else do
---     nextX <- rng 0 (width - 1)
---     if nextX /= x && not (hasCycle ((nextX, y):path))
---         then go ((nextX, y):path) True (len - 1)
---         else go path True (len + 1) -- Retry if invalid move
+        -- xs <- shuffleRange xBot xTop
+        putStrLn $ show len ++ " vertical"
+        exploreXs xs
+            where
+                (x,y) = head path
+                fullPath = generatePathPoints path
+                (xBot, xTop) = findRange False fullPath (head path) (fromX, width - 2)
+                exploreXs [] = do
+                    go (tail path) True (len + 1)
+                exploreXs (new:rest) = do
+                    let newLine = filter (/=(x, y)) (generatePathPoints [(x, y), (new, y)])                
+                    if (x /= new) && not (hasCycle2 (newLine ++ fullPath))
+                        then do
+                            let newPath = (new, y) : path
+                            result <- go ((new, y):path) True (len - 1)
+                            if null result
+                                then exploreXs rest  -- Try next option if current one fails
+                                else return result
+                        else exploreXs rest  -- Try next option if current one fails
 
 main :: IO ()
 main = do
-    let width = 15
-    let height = 15
+    let width = 20
+    let height = 10
     let startX = 6
     let pathLength = 10
-    path <- generatePath (0, width) (0, height) startX pathLength
+    path <- generatePath (0, width) (0, height) (startX, 0) pathLength
     let maze = connectAllPoints path (initializeMaze height width)
+    print path
     printMaze maze
