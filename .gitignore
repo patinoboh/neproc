@@ -2,3 +2,5 @@ Solutions/
 .vscode/
 translation.txt
 dist-newstyle/
+**/junk/
+**/junk/*
